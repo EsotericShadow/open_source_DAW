@@ -1,0 +1,1 @@
+g++ -shared -o audio_engine.so -fPIC audio_engine.cpp -lportaudio
