@@ -14,9 +14,11 @@
 
 extern "C" {
 
-// Audio settings
-const int SAMPLE_RATE = 44100;
-const int FRAMES_PER_BUFFER = 256;
+// Configuration structure for audio settings
+struct AudioConfig {
+    int sampleRate;
+    int framesPerBuffer;
+};
 
 // Global variables for audio data
 float* inputBuffer;
@@ -30,6 +32,9 @@ struct Track {
 
 // Vector of tracks representing the mixer
 std::vector<Track> mixer;
+
+// Configuration instance
+AudioConfig audioConfig;
 
 // PortAudio callback function
 static int paCallback(const void* inputBuffer, void* outputBuffer,
@@ -62,21 +67,24 @@ static int paCallback(const void* inputBuffer, void* outputBuffer,
     return paContinue;
 }
 
-// Example: Initialize audio engine
-void initialize_audio_engine() {
+// Example: Initialize audio engine with custom configuration
+void initialize_audio_engine(const AudioConfig& config) {
     PaError err = Pa_Initialize();
     if (err != paNoError) {
         throw std::runtime_error("PortAudio initialization failed: " + std::string(Pa_GetErrorText(err)));
     }
 
+    // Update audio configuration
+    audioConfig = config;
+
     // Allocate input and output buffers
-    inputBuffer = new float[FRAMES_PER_BUFFER];
-    outputBuffer = new float[FRAMES_PER_BUFFER];
+    inputBuffer = new float[audioConfig.framesPerBuffer];
+    outputBuffer = new float[audioConfig.framesPerBuffer];
 
     // Set up PortAudio stream
     PaStream* stream;
-    err = Pa_OpenDefaultStream(&stream, 1, 1, paFloat32, SAMPLE_RATE,
-                               FRAMES_PER_BUFFER, paCallback, NULL);
+    err = Pa_OpenDefaultStream(&stream, 1, 1, paFloat32, audioConfig.sampleRate,
+                               audioConfig.framesPerBuffer, paCallback, NULL);
 
     if (err != paNoError) {
         throw std::runtime_error("PortAudio stream opening failed: " + std::string(Pa_GetErrorText(err)));
@@ -89,6 +97,33 @@ void initialize_audio_engine() {
     }
 
     std::cout << "Audio engine initialized successfully." << std::endl;
+}
+
+// Update audio configuration during runtime
+void update_audio_config(const AudioConfig& newConfig) {
+    // Stop and close the existing stream
+    Pa_StopStream(Pa_GetStreamByIndex(0));
+    Pa_CloseStream(Pa_GetStreamByIndex(0));
+
+    // Update audio configuration
+    audioConfig = newConfig;
+
+    // Set up a new PortAudio stream with the updated configuration
+    PaStream* stream;
+    PaError err = Pa_OpenDefaultStream(&stream, 1, 1, paFloat32, audioConfig.sampleRate,
+                                       audioConfig.framesPerBuffer, paCallback, NULL);
+
+    if (err != paNoError) {
+        throw std::runtime_error("PortAudio stream opening failed: " + std::string(Pa_GetErrorText(err)));
+    }
+
+    // Start the new stream
+    err = Pa_StartStream(stream);
+    if (err != paNoError) {
+        throw std::runtime_error("PortAudio stream starting failed: " + std::string(Pa_GetErrorText(err)));
+    }
+
+    std::cout << "Audio configuration updated successfully." << std::endl;
 }
 
 // Add a track to the mixer
